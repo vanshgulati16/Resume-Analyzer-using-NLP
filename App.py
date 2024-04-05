@@ -3,7 +3,7 @@ import nltk
 import spacy
 nltk.download('stopwords')
 spacy.load('en_core_web_sm')
-import sqlalchemy as db
+# import sqlalchemy as db
 import pandas as pd
 import base64, random
 from pyresparser import ResumeParser
@@ -19,6 +19,19 @@ from PIL import Image
 from Courses import ds_course, web_course, android_course, ios_course, uiux_course
 import plotly.express as px
 import time, datetime
+
+from g4f.client import Client
+import google.generativeai as palm
+
+import os
+from dotenv import load_dotenv
+import json
+
+load_dotenv()
+
+client = Client()
+
+palm.configure(api_key=os.environ["PALM_API_KEY"])
 
 
 def get_table_download_link(df, filename, text):
@@ -39,7 +52,7 @@ def pdf_reader(file):
                                       caching=True,
                                       check_extractable=True):
             page_interpreter.process_page(page)
-            print(page)
+            print("Idhar se shuru hai",page)
         text = fake_file_handle.getvalue()
 
     # close open handles
@@ -68,6 +81,51 @@ def course_recommender(course_list):
             break
     return rec_course
 
+def get_response(resume_text):
+    # response = client.chat.completions.create(
+    #     model="gpt-3.5-turbo",
+    #     messages=[{"role": "user", "content": f"Grade this resume: {resume_text} on a scale of 1-10. Grade it on the basis of education, work experience, projects, awards & achievements and skills. Give individual and overall grade. Don't provide links"}],
+
+    # )
+    # response_content = response.choices[0].message.content
+    # return response_content
+
+    # print(response.choices[0].message.content)
+    # return response.choices[0].message.content
+
+    response = palm.generate_text(prompt=f"Grade this resume: {resume_text} on a scale of 1-10. Grade it on the basis of education, work experience, projects, awards & achievements and skills. Give individual and overall grade. Give positive points about the resume and also dont give the answer in single line give it in pointers, and display the grading in a good manner")
+    print(response.result)
+    return response.result
+
+def get_role(resume_text):
+    # response = client.chat.completions.create(
+    #     model="gpt-4",
+    #     messages=[{"role": "user", "content": f"Give answer in one word, according to the resume: {resume_text}, candidate has experience in which role. Don't mention skills, education, experience, projects and links"}],
+
+    # )
+    # response_content = response.choices[0].message.content
+    # print(response_content)
+    # return response_content
+
+    response = palm.generate_text(prompt=f"Give answer in one word, according to the resume: {resume_text}, candidate has experience in which role. Don't mention skills, education, experience, projects and links")
+    print(response.result)
+    return response.result
+    
+
+def get_level(resume_text):
+    # response = client.chat.completions.create(
+    #     model="gpt-3.5-turbo",
+    #     messages=[{"role": "user", "content": f"Give answer in one word, according to the resume: {resume_text}, what is the level of the candidate: (Fresher, Intermediate, Experienced)."}],
+
+    # )
+    # response_content = response.choices[0].message.content
+    # print(response_content)
+    # return response_content
+
+    response = palm.generate_text(prompt=f"Give answer in one word, according to the resume: {resume_text}, what is the level of the candidate: (Fresher, Intermediate, Experienced).")
+    print(response.result)
+    return response.result
+
 # connection = pymysql.connect(host='localhost', user='root', password='')
 # cursor = connection.cursor()
 
@@ -82,25 +140,27 @@ def course_recommender(course_list):
 #     cursor.execute(insert_sql, rec_values)
 #     connection.commit()
 
-engine = db.create_engine('sqlite:///database.db') #Create database .sqlite automatically
-connection = engine.connect()
-metadata = db.MetaData()
-user_data = db.Table('user_data', metadata,
-                     db.Column('id', db.INTEGER(), primary_key= True),
-                     db.Column('name', db.String(250), nullable=False),
-                     db.Column('email', db.String(250), nullable=False),
-                     db.Column('res_score', db.String(25), nullable=False),
-                     db.Column('timestamp', db.String(8), nullable=False),
-                     db.Column('no_of_pages', db.String(2), nullable=False),
-                     db.Column('predicted_field', db.String(50), nullable=False),
-                     db.Column('user_level', db.String(50), nullable=False),
-                     db.Column('actual_skills', db.String(300), nullable=False),
-                     db.Column('recommended_skills', db.String(300), nullable=False),
-                     db.Column('courses', db.String(600), nullable=False)
 
-)
+# DB linkage
+# engine = db.create_engine('sqlite:///database.db') #Create database .sqlite automatically
+# connection = engine.connect()
+# metadata = db.MetaData()
+# user_data = db.Table('user_data', metadata,
+#                      db.Column('id', db.INTEGER(), primary_key= True),
+#                      db.Column('name', db.String(250), nullable=False),
+#                      db.Column('email', db.String(250), nullable=False),
+#                      db.Column('res_score', db.String(25), nullable=False),
+#                      db.Column('timestamp', db.String(8), nullable=False),
+#                      db.Column('no_of_pages', db.String(2), nullable=False),
+#                      db.Column('predicted_field', db.String(50), nullable=False),
+#                      db.Column('user_level', db.String(50), nullable=False),
+#                      db.Column('actual_skills', db.String(300), nullable=False),
+#                      db.Column('recommended_skills', db.String(300), nullable=False),
+#                      db.Column('courses', db.String(600), nullable=False)
 
-metadata.create_all(engine)
+# )
+
+# metadata.create_all(engine)
 st.set_page_config(
     page_title="Resume Analyzer",
 )
@@ -121,6 +181,7 @@ def run():
                 f.write(pdf_file.getbuffer())
             show_pdf(save_image_path)
             resume_data = ResumeParser(save_image_path).get_extracted_data()
+            print("resume data ",resume_data)
             if resume_data:
                 ## Get the whole resume data
                 resume_text = pdf_reader(save_image_path)
@@ -138,6 +199,9 @@ def run():
 
                 print(resume_text)
                 cand_level = ''
+                st.markdown(f'''<h4 style='text-align: left; color: #d73b5c;'>You are at {get_level(resume_text)} level.</h4>''',
+                                unsafe_allow_html=True)
+
                 if resume_data['no_of_pages'] == 1:
                     cand_level = "Fresher"
                     st.markdown('''<h4 style='text-align: left; color: #d73b5c;'>You are a Fresher.</h4>''',
@@ -173,6 +237,9 @@ def run():
                 recommended_skills = []
                 reco_field = ''
                 rec_course = ''
+
+                st.success("Our analysis says you are looking for " + get_role(resume_text))
+
                 ## Courses recommendation
                 for i in resume_data['skills']:
                     ## Data science recommendation
@@ -267,7 +334,7 @@ def run():
                 cur_time = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
                 timestamp = str(cur_date + '_' + cur_time)
 
-                                ### Resume writing recommendation
+                ### Resume writing recommendation
                 st.subheader("**Resume Tips & Ideas💡**")
                 resume_score = 0
                 if 'Experience' in resume_text:
@@ -320,6 +387,7 @@ def run():
                         '''<h4 style='text-align: left; color: #fabc10;'>[-] According to our recommendation please add Projects👨‍💻. It will show that you have done work related the required position or not.</h4>''',
                         unsafe_allow_html=True)
 
+                # resume scoring
                 st.subheader("**Resume Score📝**")
                 st.markdown(
                     """
@@ -330,18 +398,20 @@ def run():
                     </style>""",
                     unsafe_allow_html=True,
                 )
-                my_bar = st.progress(0)
-                score = 0
-                for percent_complete in range(resume_score):
-                    score += 1
-                    time.sleep(0.1)
-                    my_bar.progress(percent_complete + 1)
-                st.success('** Your Resume Writing Score: ' + str(score) + '**')
+                # my_bar = st.progress(0)
+                # score = 0
+                # for percent_complete in range(resume_score):
+                #     score += 1
+                #     time.sleep(0.1)
+                #     my_bar.progress(percent_complete + 1)
+                # st.success('** Your Resume Writing Score: ' + str(score) + '**')
+                # my_bar = st.progress(get_response() * 10)
+                st.success(get_response(resume_text))
                 st.warning(
                     "** Note: This score is calculated based on the content that you have added in your Resume. **")
 
-                query = user_data.insert().values(name = resume_data['name'], email = resume_data['email'], res_score = str(resume_score), timestamp = timestamp,no_of_pages = str(resume_data['no_of_pages']),predicted_field = reco_field,user_level = cand_level,actual_skills = str(resume_data['skills']), recommended_skills = str(recommended_skills), courses = str(rec_course))
-                connection.execute(query)
+                # query = user_data.insert().values(name = resume_data['name'], email = resume_data['email'], res_score = str(resume_score), timestamp = timestamp,no_of_pages = str(resume_data['no_of_pages']),predicted_field = reco_field,user_level = cand_level,actual_skills = str(resume_data['skills']), recommended_skills = str(recommended_skills), courses = str(rec_course))
+                # connection.execute(query)
 
             else:
                 st.error('Something went wrong..') 
